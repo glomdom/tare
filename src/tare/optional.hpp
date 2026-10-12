@@ -76,13 +76,10 @@ public:
 
   constexpr Optional() noexcept : _empty{}, _has{false} {}
   constexpr Optional(NoneT) noexcept : _empty{}, _has{false} {}
-  constexpr Optional(T value) requires Movable<T>
-    : _value{tare::move(value)}, _has{true} {}
+  constexpr Optional(T value) requires Movable<T> : _value{tare::move(value)}, _has{true} {}
 
-  template <typename... Args>
-    requires ConstructibleFrom<T, Args...>
-  constexpr explicit Optional(InPlaceT, Args&&... args)
-    : _value{tare::forward<Args>(args)...}, _has{true} {}
+  template <typename... Args> requires ConstructibleFrom<T, Args...>
+  constexpr explicit Optional(InPlaceT, Args&&... args) : _value{tare::forward<Args>(args)...}, _has{true} {}
 
   constexpr Optional(const Optional&) requires TriviallyCopyable<T> = default;
   constexpr Optional& operator=(const Optional&) requires TriviallyCopyable<T> = default;
@@ -206,7 +203,7 @@ public:
     return Optional<U>{tare::forward<TFunction>(f)(tare::move(_value))};
   }
 
-  /// Like `map`, but `f` already returns an `Optional` — no double wrapping.
+  /// Like `map`, but `f` already returns an `Optional`, without double wrapping.
   template <typename TFunction>
   [[nodiscard]] constexpr auto and_then(TFunction&& f) && {
     using Result = RemoveCvRef<decltype(tare::forward<TFunction>(f)(tare::move(_value)))>;
@@ -242,6 +239,7 @@ public:
   constexpr T& emplace(Args&&... args) {
     reset();
     detail::construct_at(__builtin_addressof(_value), tare::forward<Args>(args)...);
+    
     _has = true;
 
     return _value;
