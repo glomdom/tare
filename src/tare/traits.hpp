@@ -6,17 +6,17 @@ namespace tare {
 
 template <typename T>
 struct RemoveReferenceT {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
 struct RemoveReferenceT<T&> {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
 struct RemoveReferenceT<T&&> {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
@@ -24,22 +24,22 @@ using RemoveReference = typename RemoveReferenceT<T>::Type;
 
 template <typename T>
 struct RemoveCvT {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
 struct RemoveCvT<const T> {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
 struct RemoveCvT<volatile T> {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
 struct RemoveCvT<const volatile T> {
-    using Type = T;
+  using Type = T;
 };
 
 template <typename T>
@@ -50,17 +50,17 @@ using RemoveCvRef = RemoveCv<RemoveReference<T>>;
 
 template <typename T>
 [[nodiscard]] constexpr RemoveReference<T>&& move(T&& value) noexcept {
-    return static_cast<RemoveReference<T>&&>(value);
+  return static_cast<RemoveReference<T>&&>(value);
 }
 
 template <typename T>
 [[nodiscard]] constexpr T&& forward(RemoveReference<T>& value) noexcept {
-    return static_cast<T&&>(value);
+  return static_cast<T&&>(value);
 }
 
 template <typename T>
 [[nodiscard]] constexpr T&& forward(RemoveReference<T>&& value) noexcept {
-    return static_cast<T&&>(value);
+  return static_cast<T&&>(value);
 }
 
 template <typename T>
@@ -111,7 +111,7 @@ concept TriviallyCopyAssignable = __is_trivially_assignable(T&, const T&);
 
 template <typename T>
 concept Cloneable = requires(const T& t) {
-    { t.clone() } -> SameAs<T>;
+  { t.clone() } -> SameAs<T>;
 };
 
 template <typename T>
