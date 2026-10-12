@@ -19,6 +19,7 @@ target_sources(tare
         FILES
             src/tare/traits.hpp
             src/tare/optional.hpp
+            src/tare/result.hpp
 )
 
 target_compile_features(tare INTERFACE cxx_std_26)

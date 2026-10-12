@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: BSL-1.0
-
 #pragma once
 
 #include <chrono>
@@ -114,7 +112,7 @@ inline bool check(bool ok, const char* expr, const char* file, int line) {
   }
 
   s.checks_failed += 1;
-  s.failures.push_back(Failure{file, line, std::string{expr} + "  →  was false"});
+  s.failures.push_back(Failure{file, line, std::string{expr} + "  ->  was false"});
 
   return false;
 }
@@ -135,7 +133,7 @@ bool check_eq(const TLeft& a, const TRight& b, const char* ea, const char* eb, c
   s.failures.push_back(Failure{
     file,
     line,
-    std::string{ea} + " == " + eb + "  →  expected " + show(b) + ", got " + show(a),
+    std::string{ea} + " == " + eb + "  ->  expected " + show(b) + ", got " + show(a),
   });
 
   return false;
@@ -146,7 +144,7 @@ void describe(const char* name, TBody&& body) {
   State& s = state();
 
   indent(1);
-  std::printf("\x1b[1m%s\x1b[0m\n", name);
+  std::printf("\x1b[4m%s\x1b[0m\n", name);
 
   s.depth += 1;
   body();
@@ -170,13 +168,13 @@ void it(const char* name, TBody&& body) {
 
   if (ok) {
     s.tests_passed += 1;
-    std::printf("\x1b[32mY\x1b[0m %s \x1b[90m(%d checks, %.3f ms)\x1b[0m\n", name, s.checks_in_test, ms);
+    std::printf("\x1b[32m+\x1b[0m %s \x1b[90m(%d checks, %.3f ms)\x1b[0m\n", name, s.checks_in_test, ms);
 
     return;
   }
 
   s.tests_failed += 1;
-  std::printf("\x1b[31mN %s\x1b[0m \x1b[90m(%d checks, %.3f ms)\x1b[0m\n", name, s.checks_in_test, ms);
+  std::printf("\x1b[31m- %s\x1b[0m \x1b[90m(%d checks, %.3f ms)\x1b[0m\n", name, s.checks_in_test, ms);
 
   for (std::size_t i = mark; i < s.failures.size(); i += 1) {
     const Failure& f = s.failures[i];
@@ -188,19 +186,15 @@ void it(const char* name, TBody&& body) {
   }
 }
 
-inline void begin(const char* label) {
-  std::printf("\x1b[90mRUNS\x1b[0m  %s\n\n", label);
-}
-
-inline int finish(const char* label) {
+inline int finish() {
   State& s = state();
   const int tests = s.tests_passed + s.tests_failed;
   const int checks = s.checks_passed + s.checks_failed;
 
   if (s.tests_failed == 0) {
-    std::printf("\n\x1b[42;30m PASS \x1b[0m %s\n\n", label);
+    std::printf("\n\x1b[42;30m PASS \x1b[0m \n\n");
   } else {
-    std::printf("\n\x1b[41;37m FAIL \x1b[0m %s\n\n", label);
+    std::printf("\n\x1b[41;37m FAIL \x1b[0m \n\n");
   }
 
   std::printf("  Tests   \x1b[32m%d passed\x1b[0m", s.tests_passed);

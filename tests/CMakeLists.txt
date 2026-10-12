@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: BSL-1.0
 
 add_executable(tare_tests
+    main.cpp
     optional_test.cpp
+    result_test.cpp
 )
  
 target_link_libraries(tare_tests PRIVATE tare::tare)

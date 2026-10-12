@@ -5,16 +5,8 @@
 #include <compare> // IWYU pragma: keep
 #include <new> // IWYU pragma: keep
 
+#include <tare/assert.hpp>
 #include <tare/traits.hpp>
-
-#ifndef TARE_ASSERT
-  #define TARE_ASSERT(cond) \
-    do {                    \
-      if (!(cond)) {        \
-        ::abort();          \
-      }                     \
-    } while (false)
-#endif
 
 namespace tare {
 
@@ -76,10 +68,10 @@ public:
 
   constexpr Optional() noexcept : _empty{}, _has{false} {}
   constexpr Optional(NoneT) noexcept : _empty{}, _has{false} {}
-  constexpr Optional(T value) requires Movable<T> : _value{tare::move(value)}, _has{true} {}
+  constexpr Optional(T value) requires Movable<T> : _value(tare::move(value)), _has{true} {}
 
   template <typename... Args> requires ConstructibleFrom<T, Args...>
-  constexpr explicit Optional(InPlaceT, Args&&... args) : _value{tare::forward<Args>(args)...}, _has{true} {}
+  constexpr explicit Optional(InPlaceT, Args&&... args) : _value(tare::forward<Args>(args)...), _has{true} {}
 
   constexpr Optional(const Optional&) requires TriviallyCopyable<T> = default;
   constexpr Optional& operator=(const Optional&) requires TriviallyCopyable<T> = default;
