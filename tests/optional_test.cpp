@@ -4,9 +4,9 @@
 #include "test_types.hpp"
 
 using namespace tare;
+using namespace test_types;
 using harness::describe;
 using harness::it;
-using namespace test_types;
 
 namespace {
 
