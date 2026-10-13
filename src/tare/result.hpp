@@ -70,14 +70,14 @@ public:
   template <typename U> requires ConstructibleFrom<E, U>
   constexpr Result(Err<U>&& err) : _err(tare::move(err.value)), _ok{false} {}
 
-  Result(const Result&) = delete;
-  Result& operator=(const Result&) = delete;
+  Result(const Result<T, E>&) = delete;
+  Result<T, E>& operator=(const Result<T, E>&) = delete;
 
-  constexpr Result(const Result&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
-  constexpr Result& operator=(const Result&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
+  constexpr Result(const Result<T, E>&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
+  constexpr Result<T, E>& operator=(const Result<T, E>&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
 
-  constexpr Result(Result&&) requires AppliesForAll<TriviallyMoveConstructible, T, E> = default;
-  constexpr Result(Result&& other) noexcept requires AppliesForAll<Movable, T, E> && (!AppliesForAll<TriviallyMoveConstructible, T, E>) : _ok{other._ok} {
+  constexpr Result(Result<T, E>&&) requires AppliesForAll<TriviallyMoveConstructible, T, E> = default;
+  constexpr Result(Result<T, E>&& other) noexcept requires AppliesForAll<Movable, T, E> && (!AppliesForAll<TriviallyMoveConstructible, T, E>) : _ok{other._ok} {
     if (other._ok) {
       detail::construct_at(__builtin_addressof(_value), tare::move(other._value));
     } else {
@@ -85,8 +85,8 @@ public:
     }
   }
 
-  constexpr Result& operator=(Result&&) requires AppliesForAll<TriviallyMoveAssignableAndDestructible, T, E> = default;
-  constexpr Result& operator=(Result&& other) noexcept requires AppliesForAll<Movable, T, E> && (!(AppliesForAll<TriviallyMoveAssignableAndDestructible, T, E>)) {
+  constexpr Result<T, E>& operator=(Result<T, E>&&) requires AppliesForAll<TriviallyMoveAssignableAndDestructible, T, E> = default;
+  constexpr Result<T, E>& operator=(Result<T, E>&& other) noexcept requires AppliesForAll<Movable, T, E> && (!(AppliesForAll<TriviallyMoveAssignableAndDestructible, T, E>)) {
     if (this == __builtin_addressof(other)) {
       return *this;
     }
@@ -109,21 +109,21 @@ public:
   }
 
   template <typename... Args>
-  [[nodiscard]] static constexpr Result ok(Args&&... args) {
-    return Result(OkTag{}, tare::forward<Args>(args)...);
+  [[nodiscard]] static constexpr Result<T, E> ok(Args&&... args) {
+    return Result<T, E>(OkTag{}, tare::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  [[nodiscard]] static constexpr Result err(Args&&... args) {
-    return Result(ErrTag{}, tare::forward<Args>(args)...);
+  [[nodiscard]] static constexpr Result<T, E> err(Args&&... args) {
+    return Result<T, E>(ErrTag{}, tare::forward<Args>(args)...);
   }
 
-  [[nodiscard]] constexpr Result clone() const requires Duplicable<T> && Duplicable<E> {
+  [[nodiscard]] constexpr Result<T, E> clone() const requires Duplicable<T> && Duplicable<E> {
     if (!_ok) {
-      return Result::err(detail::duplicate(_err));
+      return Result<T, E>::err(detail::duplicate(_err));
     }
 
-    return Result::ok(detail::duplicate(_value));
+    return Result<T, E>::ok(detail::duplicate(_value));
   }
 
   [[nodiscard]] constexpr bool is_ok() const noexcept {
@@ -189,7 +189,11 @@ public:
   }
 
   [[nodiscard]] constexpr T unwrap_or(T value) && {
-    return _ok ? _value : value;
+    if (!_ok) {
+      return tare::move(value);
+    }
+
+    return tare::move(_value);
   }
 
   template <typename TFunction>
@@ -266,7 +270,7 @@ public:
   }
 
   template <typename U = T, typename V = E>
-  [[nodiscard]] friend constexpr bool operator==(const Result& a, const Result& b) requires requires(const U& x, const V& y) { x == x; y == y; } {
+  [[nodiscard]] friend constexpr bool operator==(const Result<T, E>& a, const Result<T, E>& b) requires requires(const U& x, const V& y) { x == x; y == y; } {
     if (a._ok != b._ok) {
       return false;
     }

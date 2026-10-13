@@ -73,30 +73,30 @@ public:
   template <typename... Args> requires ConstructibleFrom<T, Args...>
   constexpr explicit Optional(InPlaceT, Args&&... args) : _value(tare::forward<Args>(args)...), _has{true} {}
 
-  constexpr Optional(const Optional&) requires TriviallyCopyable<T> = default;
-  constexpr Optional& operator=(const Optional&) requires TriviallyCopyable<T> = default;
+  constexpr Optional(const Optional<T>&) requires TriviallyCopyable<T> = default;
+  constexpr Optional<T>& operator=(const Optional<T>&) requires TriviallyCopyable<T> = default;
 
-  Optional(const Optional&) = delete;
-  Optional& operator=(const Optional&) = delete;
+  Optional(const Optional<T>&) = delete;
+  Optional<T>& operator=(const Optional<T>&) = delete;
 
-  [[nodiscard]] constexpr Optional clone() const requires Cloneable<T> {
+  [[nodiscard]] constexpr Optional<T> clone() const requires Cloneable<T> {
     if (!_has) {
-      return Optional{};
+      return Optional<T>{};
     }
 
-    return Optional{InPlace, _value.clone()};
+    return Optional<T>{InPlace, _value.clone()};
   }
 
-  constexpr Optional(Optional&&) requires TriviallyMoveConstructible<T> = default;
-  constexpr Optional(Optional&& other) noexcept requires Movable<T> && (!TriviallyMoveConstructible<T>) : _empty{}, _has{false} {
+  constexpr Optional(Optional<T>&&) requires TriviallyMoveConstructible<T> = default;
+  constexpr Optional(Optional<T>&& other) noexcept requires Movable<T> && (!TriviallyMoveConstructible<T>) : _empty{}, _has{false} {
     if (other._has) {
       detail::construct_at(__builtin_addressof(_value), tare::move(other._value));
       _has = true;
     }
   }
 
-  constexpr Optional& operator=(Optional&&) requires TriviallyMoveAssignable<T> && TriviallyDestructible<T> = default;
-  constexpr Optional& operator=(Optional&& other) noexcept requires Movable<T> && (!(TriviallyMoveAssignable<T> && TriviallyDestructible<T>)) {
+  constexpr Optional<T>& operator=(Optional<T>&&) requires TriviallyMoveAssignable<T> && TriviallyDestructible<T> = default;
+  constexpr Optional<T>& operator=(Optional<T>&& other) noexcept requires Movable<T> && (!(TriviallyMoveAssignable<T> && TriviallyDestructible<T>)) {
     if (this == __builtin_addressof(other)) {
       return *this;
     }
@@ -111,7 +111,7 @@ public:
     return *this;
   }
 
-  constexpr Optional& operator=(NoneT) noexcept {
+  constexpr Optional<T>& operator=(NoneT) noexcept {
     reset();
 
     return *this;
@@ -210,21 +210,21 @@ public:
   }
 
   template <typename TFunction>
-  [[nodiscard]] constexpr Optional or_else(TFunction&& f) && requires Movable<T> {
+  [[nodiscard]] constexpr Optional<T> or_else(TFunction&& f) && requires Movable<T> {
     if (_has) {
-      return Optional{tare::move(_value)};
+      return Optional<T>{tare::move(_value)};
     }
 
     return tare::forward<TFunction>(f)();
   }
 
   template <typename TPredicate>
-  [[nodiscard]] constexpr Optional filter(TPredicate&& p) && requires Movable<T> {
+  [[nodiscard]] constexpr Optional<T> filter(TPredicate&& p) && requires Movable<T> {
     if (_has && tare::forward<TPredicate>(p)(_value)) {
-      return Optional{tare::move(_value)};
+      return Optional<T>{tare::move(_value)};
     }
 
-    return Optional{};
+    return Optional<T>{};
   }
 
   template <typename... Args> requires ConstructibleFrom<T, Args...>
@@ -245,19 +245,19 @@ public:
     return _value;
   }
 
-  [[nodiscard]] constexpr Optional take() noexcept requires Movable<T> {
+  [[nodiscard]] constexpr Optional<T> take() noexcept requires Movable<T> {
     if (!_has) {
-      return Optional{};
+      return Optional<T>{};
     }
 
-    Optional result{tare::move(_value)};
+    Optional<T> result{tare::move(_value)};
     reset();
 
     return result;
   }
 
-  constexpr Optional replace(T value) requires Movable<T> {
-    Optional old = take();
+  constexpr Optional<T> replace(T value) requires Movable<T> {
+    Optional<T> old = take();
     emplace(tare::move(value));
 
     return old;
@@ -271,7 +271,7 @@ public:
   }
 
   template <typename U = T>
-  [[nodiscard]] friend constexpr bool operator==(const Optional& a, const Optional& b) requires requires(const U& x, const U& y) { x == y; } {
+  [[nodiscard]] friend constexpr bool operator==(const Optional<T>& a, const Optional<T>& b) requires requires(const U& x, const U& y) { x == y; } {
     if (a._has != b._has) {
       return false;
     }
@@ -284,7 +284,7 @@ public:
   }
 
   template <typename U = T>
-  [[nodiscard]] friend constexpr auto operator<=>(const Optional& a, const Optional& b) requires requires(const U& x, const U& y) { x <=> y; } {
+  [[nodiscard]] friend constexpr auto operator<=>(const Optional<T>& a, const Optional<T>& b) requires requires(const U& x, const U& y) { x <=> y; } {
     using Ordering = decltype(declval<const U&>() <=> declval<const U&>());
 
     if (a._has && b._has) {
@@ -294,11 +294,11 @@ public:
     return static_cast<Ordering>(a._has <=> b._has);
   }
 
-  [[nodiscard]] friend constexpr bool operator==(const Optional& a, NoneT) noexcept {
+  [[nodiscard]] friend constexpr bool operator==(const Optional<T>& a, NoneT) noexcept {
     return !a._has;
   }
 
-  [[nodiscard]] friend constexpr auto operator<=>(const Optional& a, NoneT) noexcept {
+  [[nodiscard]] friend constexpr auto operator<=>(const Optional<T>& a, NoneT) noexcept {
     return a._has <=> false;
   }
 
