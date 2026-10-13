@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tare/optional.hpp"
+#include <tare/optional.hpp>
 #include <tare/assert.hpp>
 #include <tare/traits.hpp>
 
