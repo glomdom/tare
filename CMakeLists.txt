@@ -17,9 +17,11 @@ target_sources(tare
         FILE_SET HEADERS
         BASE_DIRS src
         FILES
-            src/tare/traits.hpp
             src/tare/optional.hpp
             src/tare/result.hpp
+            src/tare/span.hpp
+            src/tare/traits.hpp
+            src/tare/types.hpp
 )
 
 set_target_properties(tare PROPERTIES CXX_EXTENSIONS OFF)

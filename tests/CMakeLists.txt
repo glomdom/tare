@@ -6,6 +6,7 @@ add_executable(tare_tests
     main.cpp
     optional_test.cpp
     result_test.cpp
+    span_test.cpp
 )
 
 if (TESTS_SANITIZE)
