@@ -11,7 +11,7 @@ using harness::it;
 namespace {
 
 template <typename To>
-void accept(To);
+[[maybe_unused]] void accept(To);
 
 template <typename From, typename To>
 concept ImplicitlyConvertibleTo = requires(From from) { accept<To>(from); };
