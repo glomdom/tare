@@ -67,6 +67,44 @@ public:
   template <typename U> requires ConstructibleFrom<E, U>
   constexpr Result(Err<U>&& err) : _err(tare::move(err.value)), _ok{false} {}
 
+  Result(const Result&) = delete;
+  Result& operator=(const Result&) = delete;
+
+  constexpr Result(const Result&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
+  constexpr Result& operator=(const Result&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
+
+  constexpr Result(Result&&) requires TriviallyMoveConstructible<T> && TriviallyMoveConstructible<E> = default;
+  constexpr Result(Result&& other) noexcept requires AppliesForAll<Movable, T, E> && (!(TriviallyMoveConstructible<T> && TriviallyMoveConstructible<E>)) {
+    if (other._ok) {
+      detail::construct_at(__builtin_addressof(_value), tare::move(other._value));
+    } else {
+      detail::construct_at(__builtin_addressof(_err), tare::move(other._err));
+    }
+  }
+
+  constexpr Result& operator=(Result&&) requires AppliesForAll<TriviallyMoveAssignableAndDestructible, T, E> = default;
+  constexpr Result& operator=(Result&& other) noexcept requires AppliesForAll<Movable, T, E> && (!(AppliesForAll<TriviallyMoveAssignableAndDestructible, T, E>)) {
+    if (this == __builtin_addressof(other)) {
+      return *this;
+    }
+
+    destroy();
+
+    _ok = other._ok;
+    if (other._ok) {
+      detail::construct_at(__builtin_addressof(_value), tare::move(other._value));
+    } else {
+      detail::construct_at(__builtin_addressof(_err), tare::move(other._err));
+    }
+
+    return *this;
+  }
+
+  constexpr ~Result() requires TriviallyDestructible<T> && TriviallyDestructible<E> = default;
+  constexpr ~Result() {
+    destroy();
+  }
+
   template <typename... Args>
   [[nodiscard]] static constexpr Result ok(Args&&... args) {
     return Result(OkTag{}, tare::forward<Args>(args)...);
@@ -233,6 +271,14 @@ private:
   
   template <typename... Args>
   constexpr Result(ErrTag, Args&&...args) : _err(tare::forward<Args>(args)...), _ok{false} {}
+
+  constexpr void destroy() {
+    if (_ok) {
+      detail::destroy_at(__builtin_addressof(_value));
+    } else { 
+      detail::destroy_at(__builtin_addressof(_err));
+    }
+  }
 
   union {
     T _value;
