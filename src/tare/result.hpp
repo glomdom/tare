@@ -61,6 +61,9 @@ constexpr X duplicate(const X& x) {
 template <typename T, typename E>
 class Result {
 public:
+  using ValueType = T;
+  using ErrorType = E;
+
   template <typename U> requires ConstructibleFrom<T, U>
   constexpr Result(Ok<U>&& ok) : _value(tare::move(ok.value)), _ok{true} {}
   
@@ -260,6 +263,19 @@ public:
     }
 
     return tare::forward<TFunction>(f)(tare::move(_err));
+  }
+
+  template <typename U = T, typename V = E>
+  [[nodiscard]] friend constexpr bool operator==(const Result& a, const Result& b) requires requires(const U& x, const V& y) { x == x; y == y; } {
+    if (a._ok != b._ok) {
+      return false;
+    }
+
+    if (a._ok) {
+      return a._value == b._value;
+    }
+    
+    return a._err == b._err;
   }
 
 private:
