@@ -22,18 +22,16 @@ struct Err {
 template <typename T>
 Err(T) -> Err<T>;
 
-struct InPlaceOkT {
-  explicit constexpr InPlaceOkT() = default;
-};
-
-struct InPlaceErrT {
-  explicit constexpr InPlaceErrT() = default;
-};
-
-inline constexpr InPlaceOkT InPlaceOk{};
-inline constexpr InPlaceErrT InPlaceErr{};
+template <typename T, typename E>
+class Result;
 
 namespace detail {
+
+template <typename T>
+inline constexpr bool is_result_v = false;
+
+template <typename T, typename E>
+inline constexpr bool is_result_v<Result<T, E>> = true;
 
 template <typename X>
 constexpr X duplicate(const X& x) {
@@ -68,19 +66,23 @@ public:
   
   template <typename U> requires ConstructibleFrom<E, U>
   constexpr Result(Err<U>&& err) : _err(tare::move(err.value)), _ok{false} {}
-  
-  template <typename... Args> requires ConstructibleFrom<T, Args...>
-  constexpr explicit Result(InPlaceOkT, Args&&... args) : _value(tare::forward<Args>(args)...), _ok{true} {}
-  
-  template <typename... Args> requires ConstructibleFrom<E, Args...>
-  constexpr explicit Result(InPlaceErrT, Args&&... args) : _err(tare::forward<Args>(args)...), _ok{false} {}
+
+  template <typename... Args>
+  [[nodiscard]] static constexpr Result ok(Args&&... args) {
+    return Result(OkTag{}, tare::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  [[nodiscard]] static constexpr Result err(Args&&... args) {
+    return Result(ErrTag{}, tare::forward<Args>(args)...);
+  }
 
   [[nodiscard]] constexpr Result clone() const requires Duplicable<T> && Duplicable<E> {
     if (!_ok) {
-      return Result{InPlaceErr, detail::duplicate(_err)};
+      return Result::err(detail::duplicate(_err));
     }
 
-    return Result{InPlaceOk, detail::duplicate(_value)};
+    return Result::ok(detail::duplicate(_value));
   }
 
   [[nodiscard]] constexpr bool is_ok() const noexcept {
@@ -174,7 +176,64 @@ public:
     return Optional<E>{tare::move(_err)};
   }
 
+  template <typename TFunction>
+  [[nodiscard]] constexpr auto map(TFunction&& f) && {
+    using U = RemoveCvRef<decltype(tare::forward<TFunction>(f)(tare::move(_value)))>;
+
+    if (!_ok) {
+      return Result<U, E>::err(tare::move(_err));
+    }
+
+    return Result<U, E>::ok(tare::forward<TFunction>(f)(tare::move(_value)));
+  }
+
+  template <typename TFunction>
+  [[nodiscard]] constexpr auto map_err(TFunction&& f) && {
+    using U = RemoveCvRef<decltype(tare::forward<TFunction>(f)(tare::move(_err)))>;
+
+    if (_ok) {
+      return Result<T, U>::ok(tare::move(_value));
+    }
+
+    return Result<T, U>::err(tare::forward<TFunction>(f)(tare::move(_err)));
+  }
+
+  template <typename TFunction>
+  [[nodiscard]] constexpr auto and_then(TFunction&& f) && {
+    using Output = RemoveCvRef<decltype(tare::forward<TFunction>(f)(tare::move(_value)))>;
+
+    static_assert(detail::is_result_v<Output>, "and_then callback must return a Result");
+
+    if (!_ok) {
+      return Output::err(tare::move(_err));
+    }
+
+    return tare::forward<TFunction>(f)(tare::move(_value));
+  }
+
+  template <typename TFunction>
+  [[nodiscard]] constexpr auto or_else(TFunction&& f) && {
+    using Output = RemoveCvRef<decltype(tare::forward<TFunction>(f)(tare::move(_err)))>;
+
+    static_assert(detail::is_result_v<Output>, "or_else callback must return a Result");
+
+    if (_ok) {
+      return Output::ok(tare::move(_value));
+    }
+
+    return tare::forward<TFunction>(f)(tare::move(_err));
+  }
+
 private:
+  struct OkTag {};
+  struct ErrTag {};
+
+  template <typename... Args>
+  constexpr Result(OkTag, Args&&...args) : _value(tare::forward<Args>(args)...), _ok{true} {}
+  
+  template <typename... Args>
+  constexpr Result(ErrTag, Args&&...args) : _err(tare::forward<Args>(args)...), _ok{false} {}
+
   union {
     T _value;
     E _err;
