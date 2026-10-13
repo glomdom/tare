@@ -104,6 +104,12 @@ template <typename T>
 concept TriviallyMoveAssignable = __is_trivially_assignable(T&, T&&);
 
 template <typename T>
+concept TriviallyMoveAssignableAndDestructible = TriviallyMoveAssignable<T> && TriviallyDestructible<T>;
+
+template <template <typename> concept Concept, typename... Ts>
+concept AppliesForAll = (Concept<Ts> && ...);
+
+template <typename T>
 concept TriviallyCopyConstructible = __is_trivially_constructible(T, const T&);
 
 template <typename T>
