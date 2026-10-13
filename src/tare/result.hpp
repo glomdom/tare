@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tare/optional.hpp"
 #include <tare/assert.hpp>
 #include <tare/traits.hpp>
 
@@ -130,6 +131,47 @@ public:
     TARE_ASSERT(_ok);
 
     return __builtin_addressof(_value);
+  }
+
+  [[nodiscard]] constexpr T unwrap() && {
+    TARE_ASSERT(_ok);
+
+    return tare::move(_value);
+  } 
+
+  [[nodiscard]] constexpr E unwrap_err() && {
+    TARE_ASSERT(!_ok);
+
+    return tare::move(_err);
+  }
+
+  [[nodiscard]] constexpr T unwrap_or(T value) && {
+    return _ok ? _value : value;
+  }
+
+  template <typename TFunction>
+  [[nodiscard]] constexpr T unwrap_or_else(TFunction&& f) && {
+    if (_ok) {
+      return tare::move(_value);
+    }
+
+    return tare::forward<TFunction>(f)(tare::move(_err));
+  }
+  
+  [[nodiscard]] constexpr Optional<T> ok() && requires Movable<T> {
+    if (!_ok) {
+      return None;
+    }
+
+    return Optional<T>{tare::move(_value)};
+  }
+
+  [[nodiscard]] constexpr Optional<E> err() && requires Movable<E> {
+    if (_ok) {
+      return None;
+    }
+
+    return Optional<E>{tare::move(_err)};
   }
 
 private:

@@ -27,7 +27,7 @@ target_compile_features(tare INTERFACE cxx_std_26)
 set_target_properties(tare PROPERTIES CXX_EXTENSIONS OFF)
 
 target_compile_options(tare INTERFACE
-    $<$<CXX_COMPILER_ID:Clang,GNU>:-Wall -Wextra -Wconversion>
+    $<$<CXX_COMPILER_ID:Clang,GNU>:-Wall -Wextra -Wconversion -fcolor-diagnostics>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
