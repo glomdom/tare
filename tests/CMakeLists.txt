@@ -29,6 +29,11 @@ target_compile_options(tare_tests PRIVATE
     $<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=100000000>
     $<$<CXX_COMPILER_ID:MSVC>:/constexpr:steps100000000>
 ) # stupid shit
+
+target_compile_options(tare INTERFACE
+    $<$<CXX_COMPILER_ID:Clang,GNU>:-Wall -Wextra -Wpedantic -Wconversion -fcolor-diagnostics>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
  
 add_test(NAME tare_tests COMMAND tare_tests)
  
