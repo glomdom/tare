@@ -73,8 +73,8 @@ public:
   constexpr Result(const Result&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
   constexpr Result& operator=(const Result&) requires AppliesForAll<TriviallyCopyable, T, E> = default;
 
-  constexpr Result(Result&&) requires TriviallyMoveConstructible<T> && TriviallyMoveConstructible<E> = default;
-  constexpr Result(Result&& other) noexcept requires AppliesForAll<Movable, T, E> && (!(TriviallyMoveConstructible<T> && TriviallyMoveConstructible<E>)) {
+  constexpr Result(Result&&) requires AppliesForAll<TriviallyMoveConstructible, T, E> = default;
+  constexpr Result(Result&& other) noexcept requires AppliesForAll<Movable, T, E> && (!AppliesForAll<TriviallyMoveConstructible, T, E>) : _ok{other._ok} {
     if (other._ok) {
       detail::construct_at(__builtin_addressof(_value), tare::move(other._value));
     } else {
@@ -285,7 +285,7 @@ private:
     E _err;
   };
 
-  bool _ok;
+  bool _ok{};
 };
 
 }
