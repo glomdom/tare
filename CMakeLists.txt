@@ -19,6 +19,7 @@ target_sources(tare
         FILES
             src/tare/optional.hpp
             src/tare/result.hpp
+            src/tare/panic.hpp
             src/tare/span.hpp
             src/tare/traits.hpp
             src/tare/types.hpp
@@ -36,4 +37,32 @@ option(TARE_BUILD_TESTS "Build tare tests" ${PROJECT_IS_TOP_LEVEL})
 if(TARE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+endif()
+
+option(TARE_BUILD_DOCS "Build tare documentation" OFF)
+if(TARE_BUILD_DOCS)
+    find_package(Doxygen REQUIRED)
+
+    set(DOXYGEN_PROJECT_NAME "tare")
+    set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${PROJECT_SOURCE_DIR}/docs/index.md")
+    set(DOXYGEN_FILE_PATTERNS *.hpp *.md)
+    set(DOXYGEN_EXTRACT_ALL YES)
+    set(DOXYGEN_EXCLUDE_SYMBOLS tare::detail tare::detail::*)
+    set(DOXYGEN_EXCLUDE "${PROJECT_SOURCE_DIR}/docs/doxygen-awesome-css")
+    set(DOXYGEN_GENERATE_TREEVIEW YES)
+    set(DOXYGEN_DISABLE_INDEX NO)
+    set(DOXYGEN_FULL_SIDEBAR NO)
+    set(DOXYGEN_HTML_COLORSTYLE LIGHT)
+    set(DOXYGEN_HTML_EXTRA_STYLESHEET "${PROJECT_SOURCE_DIR}/docs/doxygen-awesome-css/doxygen-awesome.css")
+    set(DOXYGEN_WARN_IF_UNDOCUMENTED NO)
+    set(DOXYGEN_SHOW_FILES NO)
+    set(DOXYGEN_SHOW_USED_FILES NO)
+    set(DOXYGEN_VERBATIM_HEADERS NO)
+    set(DOXYGEN_JAVADOC_AUTOBRIEF YES)
+
+    doxygen_add_docs(tare_docs
+        "${PROJECT_SOURCE_DIR}/src/tare"
+        "${PROJECT_SOURCE_DIR}/docs"
+        COMMENT "Generating tare docs"
+    )
 endif()

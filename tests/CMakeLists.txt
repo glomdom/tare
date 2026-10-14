@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSL-1.0
 
-option(TESTS_SANITIZE "Build tests with asan and ubsan" OFF)
+option(TARE_SANITIZE_TESTS "Build tests with asan and ubsan" OFF)
 
 add_executable(tare_tests
     main.cpp
@@ -9,7 +9,7 @@ add_executable(tare_tests
     span_test.cpp
 )
 
-if (TESTS_SANITIZE)
+if (TARE_SANITIZE_TESTS)
     target_compile_options(tare_tests PRIVATE
         -fsanitize=address,undefined
         -fno-sanitize-recover=all
