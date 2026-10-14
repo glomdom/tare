@@ -48,7 +48,7 @@ if(TARE_BUILD_DOCS)
     set(DOXYGEN_FILE_PATTERNS *.hpp *.md)
     set(DOXYGEN_EXTRACT_ALL YES)
     set(DOXYGEN_EXCLUDE_SYMBOLS tare::detail tare::detail::*)
-    set(DOXYGEN_EXCLUDE "${PROJECT_SOURCE_DIR}/docs/doxygen-awesome-css")
+    set(DOXYGEN_EXCLUDE "${PROJECT_SOURCE_DIR}/docs/doxygen-awesome-css" "${PROJECT_SOURCE_DIR}/docs/node_modules")
     set(DOXYGEN_GENERATE_TREEVIEW YES)
     set(DOXYGEN_DISABLE_INDEX NO)
     set(DOXYGEN_FULL_SIDEBAR NO)
@@ -60,8 +60,8 @@ if(TARE_BUILD_DOCS)
     set(DOXYGEN_VERBATIM_HEADERS NO)
     set(DOXYGEN_JAVADOC_AUTOBRIEF YES)
     set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-    set(DOXYGEN_HTML_OUTPUT "html")
     set(DOXYGEN_GENERATE_HTML YES)
+    set(DOXYGEN_HTML_OUTPUT "html")
 
     doxygen_add_docs(tare_docs
         "${PROJECT_SOURCE_DIR}/src/tare"
