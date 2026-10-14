@@ -31,7 +31,7 @@ constexpr bool whole_api_in_constant_evaluation() {
   int destroyed = 0;
 
   {
-    Optional<Tracked> t{InPlace, &destroyed};
+    auto t = Optional<Tracked>::some(&destroyed);
     t.emplace(&destroyed);
   }
 
@@ -100,15 +100,15 @@ void construction() {
       CHECK(a != None);
     });
 
-    it("builds in place from arguments", [] {
-      Optional<Duplicate> a{InPlace, 7};
+    it("builds through some from arguments", [] {
+      auto a = Optional<Duplicate>::some(7);
 
       CHECK(a.has_value());
       CHECK_EQ(a->v, 7);
     });
 
-    it("builds an immovable type in place", [] {
-      Optional<Immovable> a{InPlace, 9};
+    it("builds an immovable type through some", [] {
+      auto a = Optional<Immovable>::some(9);
 
       CHECK(a.has_value());
       CHECK_EQ(a->v, 9);
@@ -123,7 +123,7 @@ void construction() {
     });
 
     it("duplicates through clone when it is not", [] {
-      Optional<Duplicate> a{InPlace, 3};
+      auto a = Optional<Duplicate>::some(3);
       Optional<Duplicate> b = a.clone();
 
       b->v = 4;
@@ -174,7 +174,7 @@ void access() {
     });
 
     it("reaches members through the arrow", [] {
-      Optional<Duplicate> a{InPlace, 11};
+      auto a = Optional<Duplicate>::some(11);
 
       CHECK_EQ(a->v, 11);
     });
@@ -314,7 +314,7 @@ void lifetime() {
       int destroyed = 0;
 
       {
-        Optional<Tracked> a{InPlace, &destroyed};
+        auto a = Optional<Tracked>::some(&destroyed);
         a.reset();
 
         CHECK_EQ(destroyed, 1);
@@ -328,7 +328,7 @@ void lifetime() {
       int destroyed = 0;
 
       {
-        Optional<Tracked> a{InPlace, &destroyed};
+        auto a = Optional<Tracked>::some(&destroyed);
       }
 
       CHECK_EQ(destroyed, 1);
@@ -348,7 +348,7 @@ void lifetime() {
       int destroyed = 0;
 
       {
-        Optional<Tracked> a{InPlace, &destroyed};
+        auto a = Optional<Tracked>::some(&destroyed);
         a.emplace(&destroyed);
 
         CHECK_EQ(destroyed, 1);
@@ -361,7 +361,7 @@ void lifetime() {
       int destroyed = 0;
 
       {
-        Optional<Tracked> a{InPlace, &destroyed};
+        auto a = Optional<Tracked>::some(&destroyed);
         a = None;
 
         CHECK_EQ(destroyed, 1);
@@ -375,7 +375,7 @@ void lifetime() {
       int destroyed = 0;
 
       {
-        Optional<Tracked> a{InPlace, &destroyed};
+        auto a = Optional<Tracked>::some(&destroyed);
         Optional<Tracked> b = tare::move(a);
 
         CHECK_EQ(destroyed, 0);

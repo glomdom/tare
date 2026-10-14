@@ -9,6 +9,10 @@
 
 namespace tare {
 
+/// Aborts and outputs a message to stderr, using the current source location.
+///
+/// \param message The message to output
+/// \param location The source location, default is where it was called.
 [[noreturn]] inline void panic(std::string_view message, std::source_location location = std::source_location::current()) noexcept {
   std::fprintf(
     stderr,
