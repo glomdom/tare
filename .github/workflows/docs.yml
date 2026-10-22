@@ -22,10 +22,16 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build doxygen graphviz
+          sudo apt-get install -y clang ninja-build doxygen graphviz
+          pipx install cmake
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DTARE_BUILD_DOCS=ON -DTARE_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_CXX_COMPILER=clang++
+          -DTARE_BUILD_DOCS=ON
+          -DTARE_BUILD_TESTS=OFF
+          -DCMAKE_BUILD_TYPE=Release
 
       - name: Build documentation
         run: cmake --build build --target tare_docs
