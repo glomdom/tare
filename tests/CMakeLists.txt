@@ -34,6 +34,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 add_executable(tare_tests
+    heap_allocator_test.cpp
     optional_test.cpp
     result_test.cpp
     span_test.cpp

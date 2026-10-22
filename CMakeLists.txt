@@ -9,11 +9,13 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(tare INTERFACE)
+add_library(tare)
 add_library(tare::tare ALIAS tare)
 
 target_sources(tare
-    INTERFACE
+    PRIVATE
+        src/tare/memory/heap_allocator.cpp
+    PUBLIC
         FILE_SET HEADERS
         BASE_DIRS src
         FILES
@@ -23,12 +25,20 @@ target_sources(tare
             src/tare/span.hpp
             src/tare/traits.hpp
             src/tare/types.hpp
+            src/tare/memory/allocator.hpp
+            src/tare/memory/heap_allocator.hpp
+            src/tare/memory/layout.hpp
+)
+
+target_sources(tare PRIVATE
+    $<$<PLATFORM_ID:Windows>:src/tare/platform/memory_windows.cpp>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:src/tare/platform/memory_posix.cpp>
 )
 
 set_target_properties(tare PROPERTIES CXX_EXTENSIONS OFF)
 
-target_compile_features(tare INTERFACE cxx_std_26)
-target_compile_options(tare INTERFACE
+target_compile_features(tare PRIVATE cxx_std_26)
+target_compile_options(tare PRIVATE
     $<$<CXX_COMPILER_ID:Clang,GNU>:-Wall -Wextra -Wpedantic -Wconversion -fcolor-diagnostics>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
