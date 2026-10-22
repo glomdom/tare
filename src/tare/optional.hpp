@@ -58,7 +58,7 @@ constexpr void destroy_at(T* p) {
 /// To build the value directly from its constructor arguments, use `some()`.
 /// That's also the only way to get an immovable type in.
 ///
-/// Copies are free when `T` is trivially copyable. Otherwise you have to ask
+/// Copies are free when `T` is trivially copyable. Otherwise, you have to ask
 /// for one explicitly with `clone()`. Moving out of an %Optional doesn't
 /// empty it: the source still holds a `T`, just a moved-from one, the same as
 /// any other non-destructive move. If you want the source left empty, use

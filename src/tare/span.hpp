@@ -10,7 +10,7 @@ namespace tare {
 
 /// @brief Represents a view over an array of `T`.
 ///
-/// `Span` provides access to an existing array or contigous memory region
+/// `Span` provides access to an existing array or contiguous memory region
 /// without taking ownership or managing lifetimes. It is a container of a
 /// pointer, of the start, and the number of elements inside.
 ///

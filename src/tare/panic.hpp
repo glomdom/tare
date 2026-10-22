@@ -3,7 +3,6 @@
 #pragma once
 
 #include <cstdio>
-#include <cstdlib>
 #include <source_location>
 #include <string_view>
 
@@ -13,7 +12,7 @@ namespace tare {
 ///
 /// @param message The message to output
 /// @param location The source location, default is where it was called.
-[[noreturn]] inline void panic(std::string_view message, std::source_location location = std::source_location::current()) noexcept {
+[[noreturn]] inline void panic(const std::string_view message, const std::source_location& location = std::source_location::current()) noexcept {
   std::fprintf(
     stderr,
     "panic: %.*s\n"
