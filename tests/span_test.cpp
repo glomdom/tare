@@ -2,11 +2,9 @@
 
 #include <tare/span.hpp>
 
-#include "harness.hpp"
+#include <gtest/gtest.h>
 
 using namespace tare;
-using harness::describe;
-using harness::it;
 
 namespace {
 
@@ -16,403 +14,7 @@ template <typename To>
 template <typename From, typename To>
 concept ImplicitlyConvertibleTo = requires(From from) { accept<To>(from); };
 
-template <int>
-struct Probe {};
-
-// i would link the stackoverflow page i found this from but i forgot it and firefox history is ass so
-template <auto F>
-concept Traps = !requires { typename Probe<(F(), 0)>; };
-
-void construction() {
-  describe("construction", [] {
-    it("is empty by default", [] {
-      Span<int> s;
-
-      CHECK(s.is_empty());
-      CHECK_EQ(s.len(), usize{0});
-      CHECK(s.data() == nullptr);
-    });
-
-    it("views a whole array", [] {
-      int a[3] = {10, 20, 30};
-      Span<int> s{a};
-
-      CHECK_EQ(s.len(), usize{3});
-      CHECK(!s.is_empty());
-      CHECK(s.data() == a);
-    });
-
-    it("views a const array as const", [] {
-      const int a[2] = {1, 2};
-      Span<const int> s{a};
-
-      CHECK_EQ(s.len(), usize{2});
-      CHECK(s.data() == a);
-    });
-
-    it("builds from a raw pointer and a length", [] {
-      int a[4] = {1, 2, 3, 4};
-      auto s = Span<int>::from_raw(a + 1, 2);
-
-      CHECK_EQ(s.len(), usize{2});
-      CHECK(s.data() == a + 1);
-    });
-
-    it("refuses a raw pointer without from_raw", [] {
-      CHECK(!ConstructibleFrom<Span<int>, int*, usize>);
-    });
-
-    it("refuses to view a const array as mutable", [] {
-      CHECK(!ConstructibleFrom<Span<int>, const int (&)[3]>);
-    });
-
-    it("converts mutable to const implicitly", [] {
-      int a[2] = {1, 2};
-      Span<int> s{a};
-      Span<const int> c = s;
-
-      CHECK(ImplicitlyConvertibleTo<Span<int>, Span<const int>>);
-      CHECK(c.data() == s.data());
-      CHECK_EQ(c.len(), s.len());
-    });
-
-    it("never converts const to mutable", [] {
-      CHECK(!ConstructibleFrom<Span<int>, Span<const int>>);
-    });
-
-    it("copies as a view, not a deep copy", [] {
-      int a[2] = {1, 2};
-      Span<int> s{a};
-      Span<int> t = s;
-
-      t[0] = 9;
-
-      CHECK_EQ(a[0], 9);
-      CHECK(t.data() == s.data());
-    });
-  });
-}
-
-void access() {
-  describe("access", [] {
-    it("reads through the index operator", [] {
-      int a[3] = {10, 20, 30};
-      Span<int> s{a};
-
-      CHECK_EQ(s[0], 10);
-      CHECK_EQ(s[2], 30);
-    });
-
-    it("writes through the index operator", [] {
-      int a[3] = {10, 20, 30};
-      Span<int> s{a};
-
-      s[1] = 99;
-
-      CHECK_EQ(a[1], 99);
-    });
-
-    it("writes through a const Span", [] {
-      int a[1] = {1};
-      const Span<int> s{a};
-
-      s[0] = 5;
-
-      CHECK_EQ(a[0], 5);
-    });
-
-    it("hands out an element through get", [] {
-      int a[3] = {10, 20, 30};
-      Span<int> s{a};
-
-      CHECK(s.get(1) == a + 1);
-      CHECK_EQ(*s.get(1), 20);
-    });
-
-    it("returns null from get when out of range", [] {
-      int a[3] = {10, 20, 30};
-      Span<int> s{a};
-
-      CHECK(s.get(3) == nullptr);
-      CHECK(s.get(1000) == nullptr);
-    });
-
-    it("finds the first and last elements", [] {
-      int a[3] = {10, 20, 30};
-      Span<int> s{a};
-
-      CHECK_EQ(*s.first(), 10);
-      CHECK_EQ(*s.last(), 30);
-    });
-
-    it("has the same first and last with one element", [] {
-      int a[1] = {7};
-      Span<int> s{a};
-
-      CHECK(s.first() == s.last());
-    });
-
-    it("returns null from first and last when empty", [] {
-      Span<int> s;
-
-      CHECK(s.first() == nullptr);
-      CHECK(s.last() == nullptr);
-    });
-  });
-}
-
-void slicing() {
-  describe("slicing", [] {
-    it("takes a window out of the middle with sub", [] {
-      int a[5] = {1, 2, 3, 4, 5};
-      Span<int> s{a};
-      Span<int> w = s.sub(1, 3);
-
-      CHECK_EQ(w.len(), usize{3});
-      CHECK_EQ(w[0], 2);
-      CHECK_EQ(w[2], 4);
-    });
-
-    it("allows an empty window at the very end", [] {
-      int a[3] = {1, 2, 3};
-      Span<int> s{a};
-
-      CHECK(s.sub(3, 0).is_empty());
-    });
-
-    it("writes through a window into the original", [] {
-      int a[3] = {1, 2, 3};
-      Span<int> s{a};
-
-      s.sub(1, 1)[0] = 42;
-
-      CHECK_EQ(a[1], 42);
-    });
-
-    it("keeps the front with take", [] {
-      int a[4] = {1, 2, 3, 4};
-      Span<int> s{a};
-      Span<int> t = s.take(2);
-
-      CHECK_EQ(t.len(), usize{2});
-      CHECK(t.data() == a);
-    });
-
-    it("drops the front with skip", [] {
-      int a[4] = {1, 2, 3, 4};
-      Span<int> s{a};
-      Span<int> t = s.skip(1);
-
-      CHECK_EQ(t.len(), usize{3});
-      CHECK_EQ(t[0], 2);
-    });
-
-    it("handles take and skip at the edges", [] {
-      int a[3] = {1, 2, 3};
-      Span<int> s{a};
-
-      CHECK(s.take(0).is_empty());
-      CHECK_EQ(s.take(3).len(), usize{3});
-      CHECK(s.skip(3).is_empty());
-      CHECK_EQ(s.skip(0).len(), usize{3});
-    });
-
-    it("keeps constness through slicing", [] {
-      const int a[3] = {1, 2, 3};
-      Span<const int> s{a};
-
-      CHECK(SameAs<decltype(s.sub(0, 1)), Span<const int>>);
-      CHECK(SameAs<decltype(s.take(1)), Span<const int>>);
-      CHECK(SameAs<decltype(s.skip(1)), Span<const int>>);
-    });
-  });
-}
-
-void iteration() {
-  describe("iteration", [] {
-    it("walks every element with range-for", [] {
-      int a[4] = {1, 2, 3, 4};
-      Span<int> s{a};
-      int sum = 0;
-
-      for (int x : s) {
-        sum += x;
-      }
-
-      CHECK_EQ(sum, 10);
-    });
-
-    it("mutates through range-for", [] {
-      int a[3] = {1, 2, 3};
-      Span<int> s{a};
-
-      for (int& x : s) {
-        x *= 10;
-      }
-
-      CHECK_EQ(a[0], 10);
-      CHECK_EQ(a[2], 30);
-    });
-
-    it("never enters the loop when empty", [] {
-      Span<int> s;
-      int calls = 0;
-
-      for (int _ : s) {
-        calls += 1;
-      }
-
-      CHECK_EQ(calls, 0);
-    });
-
-    it("spans exactly len elements from begin to end", [] {
-      int a[5] = {};
-      Span<int> s{a};
-
-      CHECK(s.begin() == a);
-      CHECK(s.end() == a + 5);
-      CHECK_EQ(static_cast<usize>(s.end() - s.begin()), s.len());
-    });
-
-    it("lines first and last up with begin and end", [] {
-      int a[3] = {1, 2, 3};
-      Span<int> s{a};
-
-      CHECK(s.first() == s.begin());
-      CHECK(s.last() == s.end() - 1);
-    });
-  });
-}
-
-static_assert(Traps<[] {
-  int a[3] = {1, 2, 3};
-  Span<int> s{a};
-
-  return s[3];
-}>);
-
-static_assert(Traps<[] {
-  Span<int> s;
-
-  return s[0];
-}>);
-
-static_assert(Traps<[] {
-  int a[3] = {1, 2, 3};
-  Span<int> s{a};
-
-  return s.sub(2, 2).len();
-}>);
-
-static_assert(Traps<[] {
-  int a[3] = {1, 2, 3};
-  Span<int> s{a};
-
-  return s.sub(4, 0).len();
-}>);
-
-static_assert(Traps<[] {
-  int a[3] = {1, 2, 3};
-  Span<int> s{a};
-
-  return s.take(4).len();
-}>);
-
-static_assert(Traps<[] {
-  int a[3] = {1, 2, 3};
-  Span<int> s{a};
-
-  return s.skip(4).len();
-}>);
-
-static_assert(!Traps<[] {
-  int a[3] = {1, 2, 3};
-  Span<int> s{a};
-
-  return s[2] + static_cast<int>(s.sub(3, 0).len());
-}>);
-
-void bounds() {
-  describe("bounds", [] {
-    it("traps on an index past the end", [] {
-      CHECK(Traps<[] {
-        int a[3] = {1, 2, 3};
-        Span<int> s{a};
-
-        return s[3];
-      }>);
-    });
-
-    it("traps on any index into an empty Span", [] {
-      CHECK(Traps<[] {
-        Span<int> s;
-
-        return s[0];
-      }>);
-    });
-
-    it("traps on a window that runs past the end", [] {
-      CHECK(Traps<[] {
-        int a[3] = {1, 2, 3};
-        Span<int> s{a};
-
-        return s.sub(2, 2).len();
-      }>);
-    });
-
-    it("traps on a window that starts past the end", [] {
-      CHECK(Traps<[] {
-        int a[3] = {1, 2, 3};
-        Span<int> s{a};
-
-        return s.sub(4, 0).len();
-      }>);
-    });
-
-    it("traps instead of clamping take and skip", [] {
-      CHECK(Traps<[] {
-        int a[3] = {1, 2, 3};
-        Span<int> s{a};
-
-        return s.take(4).len();
-      }>);
-
-      CHECK(Traps<[] {
-        int a[3] = {1, 2, 3};
-        Span<int> s{a};
-
-        return s.skip(4).len();
-      }>);
-    });
-
-    it("does not trap on the last valid index", [] {
-      CHECK(!Traps<[] {
-        int a[3] = {1, 2, 3};
-        Span<int> s{a};
-
-        return s[2];
-      }>);
-    });
-  });
-}
-
-void layout() {
-  describe("layout", [] {
-    it("names its element type", [] {
-      CHECK(SameAs<Span<int>::ValueType, int>);
-      CHECK(SameAs<Span<const int>::ValueType, const int>);
-    });
-
-    it("is trivially copyable", [] {
-      CHECK(TriviallyCopyable<Span<int>>);
-      CHECK(TriviallyCopyable<Span<const int>>);
-    });
-
-    it("is a pointer and a length", [] {
-      CHECK_EQ(sizeof(Span<int>), sizeof(void*) * 2);
-    });
-  });
-}
+constexpr const char* PANIC = "panic: assertion failed";
 
 constexpr bool whole_api_in_constant_evaluation() {
   int a[5] = {1, 2, 3, 4, 5};
@@ -438,26 +40,311 @@ constexpr bool whole_api_in_constant_evaluation() {
   return sum == 9 && c.len() == 3 && c[0] == 2;
 }
 
-static_assert(whole_api_in_constant_evaluation());
-
-void constant_evaluation() {
-  describe("constant evaluation", [] {
-    it("runs the whole API at compile time", [] {
-      CHECK(whole_api_in_constant_evaluation());
-    });
-  });
 }
 
+TEST(SpanConstruction, IsEmptyByDefault) {
+  Span<int> s;
+
+  EXPECT_TRUE(s.is_empty());
+  EXPECT_EQ(s.len(), usize{0});
+  EXPECT_EQ(s.data(), nullptr);
 }
 
-void run_span_tests() {
-  describe("Span", [] {
-    construction();
-    access();
-    slicing();
-    iteration();
-    bounds();
-    layout();
-    constant_evaluation();
-  });
+TEST(SpanConstruction, ViewsAWholeArray) {
+  int a[3] = {10, 20, 30};
+  Span<int> s{a};
+
+  EXPECT_EQ(s.len(), usize{3});
+  EXPECT_FALSE(s.is_empty());
+  EXPECT_EQ(s.data(), a);
+}
+
+TEST(SpanConstruction, ViewsAConstArrayAsConst) {
+  const int a[2] = {1, 2};
+  Span<const int> s{a};
+
+  EXPECT_EQ(s.len(), usize{2});
+  EXPECT_EQ(s.data(), a);
+}
+
+TEST(SpanConstruction, BuildsFromARawPointerAndALength) {
+  int a[4] = {1, 2, 3, 4};
+  auto s = Span<int>::from_raw(a + 1, 2);
+
+  EXPECT_EQ(s.len(), usize{2});
+  EXPECT_EQ(s.data(), a + 1);
+}
+
+TEST(SpanConstruction, RefusesARawPointerWithoutFromRaw) {
+  static_assert(!ConstructibleFrom<Span<int>, int*, usize>);
+}
+
+TEST(SpanConstruction, RefusesToViewAConstArrayAsMutable) {
+  static_assert(!ConstructibleFrom<Span<int>, const int (&)[3]>);
+}
+
+TEST(SpanConstruction, ConvertsMutableToConstImplicitly) {
+  int a[2] = {1, 2};
+  Span<int> s{a};
+  Span<const int> c = s;
+
+  static_assert(ImplicitlyConvertibleTo<Span<int>, Span<const int>>);
+  EXPECT_EQ(c.data(), s.data());
+  EXPECT_EQ(c.len(), s.len());
+}
+
+TEST(SpanConstruction, NeverConvertsConstToMutable) {
+  static_assert(!ConstructibleFrom<Span<int>, Span<const int>>);
+}
+
+TEST(SpanConstruction, CopiesAsAViewNotADeepCopy) {
+  int a[2] = {1, 2};
+  Span<int> s{a};
+  Span<int> t = s;
+
+  t[0] = 9;
+
+  EXPECT_EQ(a[0], 9);
+  EXPECT_EQ(t.data(), s.data());
+}
+
+TEST(SpanAccess, ReadsThroughTheIndexOperator) {
+  int a[3] = {10, 20, 30};
+  Span<int> s{a};
+
+  EXPECT_EQ(s[0], 10);
+  EXPECT_EQ(s[2], 30);
+}
+
+TEST(SpanAccess, WritesThroughTheIndexOperator) {
+  int a[3] = {10, 20, 30};
+  Span<int> s{a};
+
+  s[1] = 99;
+
+  EXPECT_EQ(a[1], 99);
+}
+
+TEST(SpanAccess, WritesThroughAConstSpan) {
+  int a[1] = {1};
+  const Span<int> s{a};
+
+  s[0] = 5;
+
+  EXPECT_EQ(a[0], 5);
+}
+
+TEST(SpanAccess, HandsOutAnElementThroughGet) {
+  int a[3] = {10, 20, 30};
+  Span<int> s{a};
+
+  EXPECT_EQ(s.get(1), a + 1);
+  EXPECT_EQ(*s.get(1), 20);
+}
+
+TEST(SpanAccess, ReturnsNullFromGetWhenOutOfRange) {
+  int a[3] = {10, 20, 30};
+  Span<int> s{a};
+
+  EXPECT_EQ(s.get(3), nullptr);
+  EXPECT_EQ(s.get(1000), nullptr);
+}
+
+TEST(SpanAccess, FindsTheFirstAndLastElements) {
+  int a[3] = {10, 20, 30};
+  Span<int> s{a};
+
+  EXPECT_EQ(*s.first(), 10);
+  EXPECT_EQ(*s.last(), 30);
+}
+
+TEST(SpanAccess, HasTheSameFirstAndLastWithOneElement) {
+  int a[1] = {7};
+  Span<int> s{a};
+
+  EXPECT_EQ(s.first(), s.last());
+}
+
+TEST(SpanAccess, ReturnsNullFromFirstAndLastWhenEmpty) {
+  Span<int> s;
+
+  EXPECT_EQ(s.first(), nullptr);
+  EXPECT_EQ(s.last(), nullptr);
+}
+
+TEST(SpanSlicing, TakesAWindowOutOfTheMiddleWithSub) {
+  int a[5] = {1, 2, 3, 4, 5};
+  Span<int> s{a};
+  Span<int> w = s.sub(1, 3);
+
+  EXPECT_EQ(w.len(), usize{3});
+  EXPECT_EQ(w[0], 2);
+  EXPECT_EQ(w[2], 4);
+}
+
+TEST(SpanSlicing, AllowsAnEmptyWindowAtTheVeryEnd) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_TRUE(s.sub(3, 0).is_empty());
+}
+
+TEST(SpanSlicing, WritesThroughAWindowIntoTheOriginal) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  s.sub(1, 1)[0] = 42;
+
+  EXPECT_EQ(a[1], 42);
+}
+
+TEST(SpanSlicing, KeepsTheFrontWithTake) {
+  int a[4] = {1, 2, 3, 4};
+  Span<int> s{a};
+  Span<int> t = s.take(2);
+
+  EXPECT_EQ(t.len(), usize{2});
+  EXPECT_EQ(t.data(), a);
+}
+
+TEST(SpanSlicing, DropsTheFrontWithSkip) {
+  int a[4] = {1, 2, 3, 4};
+  Span<int> s{a};
+  Span<int> t = s.skip(1);
+
+  EXPECT_EQ(t.len(), usize{3});
+  EXPECT_EQ(t[0], 2);
+}
+
+TEST(SpanSlicing, HandlesTakeAndSkipAtTheEdges) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_TRUE(s.take(0).is_empty());
+  EXPECT_EQ(s.take(3).len(), usize{3});
+  EXPECT_TRUE(s.skip(3).is_empty());
+  EXPECT_EQ(s.skip(0).len(), usize{3});
+}
+
+TEST(SpanSlicing, KeepsConstnessThroughSlicing) {
+  const int a[3] = {1, 2, 3};
+  Span<const int> s{a};
+
+  static_assert(SameAs<decltype(s.sub(0, 1)), Span<const int>>);
+  static_assert(SameAs<decltype(s.take(1)), Span<const int>>);
+  static_assert(SameAs<decltype(s.skip(1)), Span<const int>>);
+}
+
+TEST(SpanIteration, WalksEveryElementWithRangeFor) {
+  int a[4] = {1, 2, 3, 4};
+  Span<int> s{a};
+  int sum = 0;
+
+  for (int x : s) {
+    sum += x;
+  }
+
+  EXPECT_EQ(sum, 10);
+}
+
+TEST(SpanIteration, MutatesThroughRangeFor) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  for (int& x : s) {
+    x *= 10;
+  }
+
+  EXPECT_EQ(a[0], 10);
+  EXPECT_EQ(a[2], 30);
+}
+
+TEST(SpanIteration, NeverEntersTheLoopWhenEmpty) {
+  Span<int> s;
+  int calls = 0;
+
+  for (int _ : s) {
+    calls += 1;
+  }
+
+  EXPECT_EQ(calls, 0);
+}
+
+TEST(SpanIteration, SpansExactlyLenElementsFromBeginToEnd) {
+  int a[5] = {};
+  Span<int> s{a};
+
+  EXPECT_EQ(s.begin(), a);
+  EXPECT_EQ(s.end(), a + 5);
+  EXPECT_EQ(static_cast<usize>(s.end() - s.begin()), s.len());
+}
+
+TEST(SpanIteration, LinesFirstAndLastUpWithBeginAndEnd) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_EQ(s.first(), s.begin());
+  EXPECT_EQ(s.last(), s.end() - 1);
+}
+
+TEST(SpanBoundsDeathTest, PanicsOnAnIndexPastTheEnd) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_DEATH((void)s[3], PANIC);
+}
+
+TEST(SpanBoundsDeathTest, PanicsOnAnyIndexIntoAnEmptySpan) {
+  Span<int> s;
+
+  EXPECT_DEATH((void)s[0], PANIC);
+}
+
+TEST(SpanBoundsDeathTest, PanicsOnAWindowThatRunsPastTheEnd) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_DEATH((void)s.sub(2, 2), PANIC);
+}
+
+TEST(SpanBoundsDeathTest, PanicsOnAWindowThatStartsPastTheEnd) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_DEATH((void)s.sub(4, 0), PANIC);
+}
+
+TEST(SpanBoundsDeathTest, PanicsInsteadOfClampingTakeAndSkip) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_DEATH((void)s.take(4), PANIC);
+  EXPECT_DEATH((void)s.skip(4), PANIC);
+}
+
+TEST(SpanBounds, DoesNotPanicOnTheLastValidIndex) {
+  int a[3] = {1, 2, 3};
+  Span<int> s{a};
+
+  EXPECT_EQ(s[2], 3);
+  EXPECT_TRUE(s.sub(3, 0).is_empty());
+}
+
+TEST(SpanLayout, NamesItsElementType) {
+  static_assert(SameAs<Span<int>::ValueType, int>);
+  static_assert(SameAs<Span<const int>::ValueType, const int>);
+}
+
+TEST(SpanLayout, IsTriviallyCopyable) {
+  static_assert(TriviallyCopyable<Span<int>>);
+  static_assert(TriviallyCopyable<Span<const int>>);
+}
+
+TEST(SpanLayout, IsAPointerAndALength) {
+  static_assert(sizeof(Span<int>) == sizeof(void*) * 2);
+}
+
+TEST(SpanConstantEvaluation, RunsTheWholeApiAtCompileTime) {
+  static_assert(whole_api_in_constant_evaluation());
+  EXPECT_TRUE(whole_api_in_constant_evaluation());
 }

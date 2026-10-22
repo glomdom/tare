@@ -2,38 +2,48 @@
 
 option(TARE_SANITIZE_TESTS "Build tests with asan and ubsan" OFF)
 
-add_executable(tare_tests
-    main.cpp
-    optional_test.cpp
-    result_test.cpp
-    span_test.cpp
-)
+include(FetchContent)
+include(GoogleTest)
 
 if (TARE_SANITIZE_TESTS)
-    target_compile_options(tare_tests PRIVATE
+    add_compile_options(
         -fsanitize=address,undefined
         -fno-sanitize-recover=all
         -fno-omit-frame-pointer
     )
 
-    target_link_options(tare_tests PRIVATE -fsanitize=address,undefined)
+    add_link_options(-fsanitize=address,undefined)
 
     if (WIN32)
-        set_target_properties(tare_tests PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+        set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
     endif ()
 endif ()
- 
-target_link_libraries(tare_tests PRIVATE tare::tare)
-target_compile_options(tare_tests PRIVATE
-    $<$<CXX_COMPILER_ID:Clang>:-fconstexpr-steps=100000000>
-    $<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=100000000>
-    $<$<CXX_COMPILER_ID:MSVC>:/constexpr:steps100000000>
-) # stupid shit
 
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.18.0
+    GIT_SHALLOW TRUE
+    SYSTEM
+)
+
+FetchContent_MakeAvailable(googletest)
+
+add_executable(tare_tests
+    optional_test.cpp
+    result_test.cpp
+    span_test.cpp
+)
+
+target_link_libraries(tare_tests PRIVATE tare::tare GTest::gtest_main)
+target_compile_features(tare_tests PRIVATE cxx_std_26)
 target_compile_options(tare INTERFACE
     $<$<CXX_COMPILER_ID:Clang,GNU>:-Wall -Wextra -Wpedantic -Wconversion -fcolor-diagnostics>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
- 
-add_test(NAME tare_tests COMMAND tare_tests)
- 
+
+gtest_discover_tests(tare_tests)

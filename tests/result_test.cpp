@@ -3,13 +3,12 @@
 #include <tare/optional.hpp>
 #include <tare/result.hpp>
 
-#include "harness.hpp"
+#include <gtest/gtest.h>
+
 #include "test_types.hpp"
 
 using namespace tare;
 using namespace test_types;
-using harness::describe;
-using harness::it;
 
 namespace {
 
@@ -17,455 +16,6 @@ enum class Error {
   Empty,
   Invalid,
 };
-
-void wrappers() {
-  describe("Ok and Err", [] {
-    it("deduces the wrapped type", [] {
-      CHECK(SameAs<decltype(Ok(5)), Ok<int>>);
-      CHECK(SameAs<decltype(Err(Error::Empty)), Err<Error>>);
-    });
-
-    it("decays a string literal to a pointer", [] {
-      CHECK(SameAs<decltype(Err("bad")), Err<const char*>>);
-    });
-
-    it("stores a copy, not a reference", [] {
-      int x = 1;
-      auto o = Ok(x);
-
-      x = 2;
-
-      CHECK(SameAs<decltype(o), Ok<int>>);
-      CHECK_EQ(o.value, 1);
-    });
-
-    it("keeps Ok and Err distinct over the same type", [] {
-      CHECK(!SameAs<Ok<int>, Err<int>>);
-    });
-
-    it("holds a move-only value", [] {
-      auto o = Ok(Duplicate{3});
-
-      CHECK_EQ(o.value.v, 3);
-    });
-  });
-}
-
-void construction() {
-  describe("construction", [] {
-    it("builds a success from Ok", [] {
-      Result<int, Error> r = Ok(5);
-
-      CHECK(r.is_ok());
-      CHECK(!r.is_err());
-      CHECK_EQ(*r, 5);
-    });
-
-    it("builds a failure from Err", [] {
-      Result<int, Error> r = Err(Error::Empty);
-
-      CHECK(r.is_err());
-      CHECK(!r.is_ok());
-      CHECK(r.error() == Error::Empty);
-    });
-
-    it("tells the sides apart when T and E match", [] {
-      Result<int, int> a = Ok(1);
-      Result<int, int> b = Err(1);
-
-      CHECK(a.is_ok());
-      CHECK(b.is_err());
-    });
-
-    it("converts the wrapped type on the way in", [] {
-      Result<long long, Error> r = Ok(5);
-
-      CHECK_EQ(*r, 5LL);
-    });
-
-    it("builds a success in place", [] {
-      auto r = Result<Duplicate, Error>::ok(7);
-
-      CHECK(r.is_ok());
-      CHECK_EQ(r->v, 7);
-    });
-
-    it("builds an immovable success in place", [] {
-      auto r = Result<Immovable, Error>::ok(9);
-
-      CHECK(r.is_ok());
-      CHECK_EQ(r->v, 9);
-    });
-
-    it("builds a failure in place", [] {
-      auto r = Result<int, Duplicate>::err(4);
-
-      CHECK(r.is_err());
-      CHECK_EQ(r.error().v, 4);
-    });
-
-    it("refuses a bare value without Ok", [] {
-      CHECK(!ConstructibleFrom<Result<int, Error>, int>);
-    });
-
-    it("has no empty state", [] {
-      CHECK(!ConstructibleFrom<Result<int, Error>>);
-    });
-
-    it("still copies when both sides copy for free", [] {
-      Result<int, int> a = Ok(5);
-      Result<int, int> b = a;
-
-      CHECK_EQ(*a, 5);
-      CHECK_EQ(*b, 5);
-    });
-
-    it("duplicates a success through clone", [] {
-      auto a = Result<Duplicate, Error>::ok(3);
-      Result<Duplicate, Error> b = a.clone();
-
-      b->v = 4;
-
-      CHECK_EQ(a->v, 3);
-      CHECK_EQ(b->v, 4);
-    });
-
-    it("duplicates a failure through clone", [] {
-      auto a = Result<int, Duplicate>::err(2);
-      Result<int, Duplicate> b = a.clone();
-
-      CHECK(b.is_err());
-      CHECK_EQ(b.error().v, 2);
-    });
-  });
-}
-
-void access() {
-  describe("access", [] {
-    it("moves the success out on unwrap", [] {
-      Result<int, Error> r = Ok(42);
-
-      CHECK_EQ(tare::move(r).unwrap(), 42);
-    });
-
-    it("moves the failure out on unwrap_err", [] {
-      Result<int, Error> r = Err(Error::Invalid);
-
-      CHECK(tare::move(r).unwrap_err() == Error::Invalid);
-    });
-
-    it("falls back on a failed unwrap_or", [] {
-      Result<int, Error> bad = Err(Error::Empty);
-      Result<int, Error> good = Ok(1);
-
-      CHECK_EQ(tare::move(bad).unwrap_or(99), 99);
-      CHECK_EQ(tare::move(good).unwrap_or(99), 1);
-    });
-
-    it("hands the error to unwrap_or_else", [] {
-      Result<int, int> r = Err(3);
-
-      CHECK_EQ(tare::move(r).unwrap_or_else([](int e) { return e * 10; }), 30);
-    });
-
-    it("only calls unwrap_or_else on failure", [] {
-      int calls = 0;
-      Result<int, int> r = Ok(1);
-
-      auto fallback = [&calls](int e) {
-        calls += 1;
-
-        return e;
-      };
-
-      CHECK_EQ(tare::move(r).unwrap_or_else(fallback), 1);
-      CHECK_EQ(calls, 0);
-    });
-
-    it("reaches members through the arrow", [] {
-      auto r = Result<Duplicate, Error>::ok(11);
-
-      CHECK_EQ(r->v, 11);
-    });
-
-    it("hands out the success as an Optional through ok", [] {
-      Result<int, Error> good = Ok(5);
-      Result<int, Error> bad = Err(Error::Empty);
-
-      Optional<int> a = tare::move(good).ok();
-      Optional<int> b = tare::move(bad).ok();
-
-      CHECK_EQ(*a, 5);
-      CHECK(!b.has_value());
-    });
-
-    it("hands out the failure as an Optional through err", [] {
-      Result<int, Error> good = Ok(5);
-      Result<int, Error> bad = Err(Error::Invalid);
-
-      Optional<Error> a = tare::move(good).err();
-      Optional<Error> b = tare::move(bad).err();
-
-      CHECK(!a.has_value());
-      CHECK(*b == Error::Invalid);
-    });
-  });
-}
-
-void transforms() {
-  describe("transforms", [] {
-    it("transforms the success through map", [] {
-      Result<int, Error> r = Ok(4);
-      auto m = tare::move(r).map([](int x) { return x * 2; });
-
-      CHECK(SameAs<decltype(m), Result<int, Error>>);
-      CHECK_EQ(*m, 8);
-    });
-
-    it("passes a failure through map untouched", [] {
-      int calls = 0;
-      Result<int, Error> r = Err(Error::Invalid);
-
-      auto m = tare::move(r).map([&calls](int x) {
-        calls += 1;
-
-        return x;
-      });
-
-      CHECK(m.is_err());
-      CHECK(m.error() == Error::Invalid);
-      CHECK_EQ(calls, 0);
-    });
-
-    it("changes the success type through map", [] {
-      Result<int, Error> r = Ok(3);
-      auto m = tare::move(r).map([](int x) { return static_cast<char>('a' + x); });
-
-      CHECK(SameAs<decltype(m), Result<char, Error>>);
-      CHECK_EQ(*m, 'd');
-    });
-
-    it("transforms the failure through map_err", [] {
-      Result<int, int> r = Err(2);
-      auto m = tare::move(r).map_err([](int e) { return static_cast<char>('a' + e); });
-
-      CHECK(SameAs<decltype(m), Result<int, char>>);
-      CHECK_EQ(m.error(), 'c');
-    });
-
-    it("passes a success through map_err untouched", [] {
-      Result<int, int> r = Ok(7);
-      auto m = tare::move(r).map_err([](int e) { return e; });
-
-      CHECK_EQ(*m, 7);
-    });
-
-    it("chains a fallible step through and_then", [] {
-      Result<int, Error> r = Ok(4);
-
-      auto m = tare::move(r).and_then([](int x) -> Result<int, Error> {
-        return Ok(x * 10);
-      });
-
-      CHECK(SameAs<decltype(m), Result<int, Error>>);
-      CHECK_EQ(*m, 40);
-    });
-
-    it("lets and_then turn a success into a failure", [] {
-      Result<int, Error> r = Ok(1);
-
-      auto m = tare::move(r).and_then([](int) -> Result<int, Error> {
-        return Err(Error::Invalid);
-      });
-
-      CHECK(m.is_err());
-      CHECK(m.error() == Error::Invalid);
-    });
-
-    it("short circuits and_then on failure", [] {
-      int calls = 0;
-      Result<int, Error> r = Err(Error::Empty);
-
-      auto m = tare::move(r).and_then([&calls](int x) -> Result<int, Error> {
-        calls += 1;
-
-        return Ok(x);
-      });
-
-      CHECK(m.is_err());
-      CHECK_EQ(calls, 0);
-    });
-
-    it("recovers from a failure through or_else", [] {
-      Result<int, int> r = Err(1);
-
-      auto m = tare::move(r).or_else([](int e) -> Result<int, Error> {
-        return Ok(e * 100);
-      });
-
-      CHECK(SameAs<decltype(m), Result<int, Error>>);
-      CHECK_EQ(*m, 100);
-    });
-
-    it("skips or_else on success", [] {
-      int calls = 0;
-      Result<int, int> r = Ok(5);
-
-      auto m = tare::move(r).or_else([&calls](int e) -> Result<int, int> {
-        calls += 1;
-
-        return Ok(e);
-      });
-
-      CHECK_EQ(*m, 5);
-      CHECK_EQ(calls, 0);
-    });
-  });
-}
-
-void lifetime() {
-  describe("lifetime", [] {
-    it("destroys a success at scope exit", [] {
-      int destroyed = 0;
-
-      {
-        auto r = Result<Tracked, int>::ok(&destroyed);
-      }
-
-      CHECK_EQ(destroyed, 1);
-    });
-
-    it("destroys a failure at scope exit", [] {
-      int destroyed = 0;
-
-      {
-        auto r = Result<int, Tracked>::err(&destroyed);
-      }
-
-      CHECK_EQ(destroyed, 1);
-    });
-
-    it("never destroys the side it does not hold", [] {
-      int destroyed = 0;
-
-      {
-        Result<Tracked, int> r = Err(5);
-      }
-
-      CHECK_EQ(destroyed, 0);
-    });
-
-    it("moves ownership without destroying twice", [] {
-      int destroyed = 0;
-
-      {
-        auto a = Result<Tracked, int>::ok(&destroyed);
-        Result<Tracked, int> b = tare::move(a);
-
-        CHECK_EQ(destroyed, 0);
-      }
-
-      CHECK_EQ(destroyed, 1);
-    });
-
-    it("destroys once after unwrap moves the value out", [] {
-      int destroyed = 0;
-
-      {
-        auto r = Result<Tracked, int>::ok(&destroyed);
-        Tracked t = tare::move(r).unwrap();
-
-        CHECK_EQ(destroyed, 0);
-      }
-
-      CHECK_EQ(destroyed, 1);
-    });
-
-    it("switches sides on move assignment", [] {
-      int destroyed = 0;
-
-      {
-        auto a = Result<Tracked, int>::ok(&destroyed);
-        Result<Tracked, int> b = Err(3);
-
-        a = tare::move(b);
-
-        CHECK_EQ(destroyed, 1);
-        CHECK(a.is_err());
-        CHECK_EQ(a.error(), 3);
-      }
-
-      CHECK_EQ(destroyed, 1);
-    });
-  });
-}
-
-void comparison() {
-  describe("comparison", [] {
-    it("compares successes by value", [] {
-      Result<int, int> a = Ok(1);
-      Result<int, int> b = Ok(1);
-      Result<int, int> c = Ok(2);
-
-      CHECK(a == b);
-      CHECK(a != c);
-    });
-
-    it("compares failures by value", [] {
-      Result<int, int> a = Err(1);
-      Result<int, int> b = Err(1);
-      Result<int, int> c = Err(2);
-
-      CHECK(a == b);
-      CHECK(a != c);
-    });
-
-    it("never equates a success with a failure", [] {
-      Result<int, int> a = Ok(1);
-      Result<int, int> b = Err(1);
-
-      CHECK(a != b);
-    });
-  });
-}
-
-void layout() {
-  describe("layout", [] {
-    it("names both sides", [] {
-      CHECK(SameAs<Result<int, Error>::ValueType, int>);
-      CHECK(SameAs<Result<int, Error>::ErrorType, Error>);
-    });
-
-    it("keeps Result<int, int> trivially copyable", [] {
-      CHECK(TriviallyCopyable<Result<int, int>>);
-      CHECK(TriviallyMoveConstructible<Result<int, int>>);
-    });
-
-    it("keeps Result<int, int> trivially destructible", [] {
-      CHECK(TriviallyDestructible<Result<int, int>>);
-    });
-
-    it("costs one word beyond the larger side", [] {
-      CHECK_EQ(sizeof(Result<int, int>), sizeof(int) * 2);
-      CHECK_EQ(sizeof(Result<int, char>), sizeof(int) * 2);
-    });
-
-    it("goes non-trivial when the success side does", [] {
-      CHECK(!TriviallyDestructible<Result<Tracked, int>>);
-      CHECK(Movable<Result<Tracked, int>>);
-    });
-
-    it("goes non-trivial when the failure side does", [] {
-      CHECK(!TriviallyDestructible<Result<int, Tracked>>);
-      CHECK(Movable<Result<int, Tracked>>);
-    });
-
-    it("refuses to move a Result over an immovable type", [] {
-      CHECK(!Movable<Result<Immovable, int>>);
-      CHECK(!Movable<Result<int, Immovable>>);
-    });
-  });
-}
 
 constexpr bool whole_api_in_constant_evaluation() {
   Result<int, Error> a = Ok(4);
@@ -494,27 +44,430 @@ constexpr bool whole_api_in_constant_evaluation() {
   return destroyed == 2;
 }
 
-static_assert(whole_api_in_constant_evaluation());
-
-void constant_evaluation() {
-  describe("constant evaluation", [] {
-    it("runs the whole API at compile time", [] {
-      CHECK(whole_api_in_constant_evaluation());
-    });
-  });
 }
 
+TEST(OkAndErr, DeducesTheWrappedType) {
+  static_assert(SameAs<decltype(Ok(5)), Ok<int>>);
+  static_assert(SameAs<decltype(Err(Error::Empty)), Err<Error>>);
 }
 
-void run_result_tests() {
-  describe("Result", [] {
-    wrappers();
-    construction();
-    access();
-    transforms();
-    lifetime();
-    comparison();
-    layout();
-    constant_evaluation();
+TEST(OkAndErr, DecaysAStringLiteralToAPointer) {
+  static_assert(SameAs<decltype(Err("bad")), Err<const char*>>);
+}
+
+TEST(OkAndErr, StoresACopyNotAReference) {
+  int x = 1;
+  auto o = Ok(x);
+
+  x = 2;
+
+  static_assert(SameAs<decltype(o), Ok<int>>);
+  EXPECT_EQ(o.value, 1);
+}
+
+TEST(OkAndErr, KeepsOkAndErrDistinctOverTheSameType) {
+  static_assert(!SameAs<Ok<int>, Err<int>>);
+}
+
+TEST(OkAndErr, HoldsAMoveOnlyValue) {
+  auto o = Ok(Duplicate{3});
+
+  EXPECT_EQ(o.value.v, 3);
+}
+
+TEST(ResultConstruction, BuildsASuccessFromOk) {
+  Result<int, Error> r = Ok(5);
+
+  EXPECT_TRUE(r.is_ok());
+  EXPECT_FALSE(r.is_err());
+  EXPECT_EQ(*r, 5);
+}
+
+TEST(ResultConstruction, BuildsAFailureFromErr) {
+  Result<int, Error> r = Err(Error::Empty);
+
+  EXPECT_TRUE(r.is_err());
+  EXPECT_FALSE(r.is_ok());
+  EXPECT_EQ(r.error(), Error::Empty);
+}
+
+TEST(ResultConstruction, TellsTheSidesApartWhenTAndEMatch) {
+  Result<int, int> a = Ok(1);
+  Result<int, int> b = Err(1);
+
+  EXPECT_TRUE(a.is_ok());
+  EXPECT_TRUE(b.is_err());
+}
+
+TEST(ResultConstruction, ConvertsTheWrappedTypeOnTheWayIn) {
+  Result<long long, Error> r = Ok(5);
+
+  EXPECT_EQ(*r, 5LL);
+}
+
+TEST(ResultConstruction, BuildsASuccessInPlace) {
+  auto r = Result<Duplicate, Error>::ok(7);
+
+  EXPECT_TRUE(r.is_ok());
+  EXPECT_EQ(r->v, 7);
+}
+
+TEST(ResultConstruction, BuildsAnImmovableSuccessInPlace) {
+  auto r = Result<Immovable, Error>::ok(9);
+
+  EXPECT_TRUE(r.is_ok());
+  EXPECT_EQ(r->v, 9);
+}
+
+TEST(ResultConstruction, BuildsAFailureInPlace) {
+  auto r = Result<int, Duplicate>::err(4);
+
+  EXPECT_TRUE(r.is_err());
+  EXPECT_EQ(r.error().v, 4);
+}
+
+TEST(ResultConstruction, RefusesABareValueWithoutOk) {
+  static_assert(!ConstructibleFrom<Result<int, Error>, int>);
+}
+
+TEST(ResultConstruction, HasNoEmptyState) {
+  static_assert(!ConstructibleFrom<Result<int, Error>>);
+}
+
+TEST(ResultConstruction, StillCopiesWhenBothSidesCopyForFree) {
+  Result<int, int> a = Ok(5);
+  Result<int, int> b = a;
+
+  EXPECT_EQ(*a, 5);
+  EXPECT_EQ(*b, 5);
+}
+
+TEST(ResultConstruction, DuplicatesASuccessThroughClone) {
+  auto a = Result<Duplicate, Error>::ok(3);
+  Result<Duplicate, Error> b = a.clone();
+
+  b->v = 4;
+
+  EXPECT_EQ(a->v, 3);
+  EXPECT_EQ(b->v, 4);
+}
+
+TEST(ResultConstruction, DuplicatesAFailureThroughClone) {
+  auto a = Result<int, Duplicate>::err(2);
+  Result<int, Duplicate> b = a.clone();
+
+  EXPECT_TRUE(b.is_err());
+  EXPECT_EQ(b.error().v, 2);
+}
+
+TEST(ResultAccess, MovesTheSuccessOutOnUnwrap) {
+  Result<int, Error> r = Ok(42);
+
+  EXPECT_EQ(tare::move(r).unwrap(), 42);
+}
+
+TEST(ResultAccess, MovesTheFailureOutOnUnwrapErr) {
+  Result<int, Error> r = Err(Error::Invalid);
+
+  EXPECT_EQ(tare::move(r).unwrap_err(), Error::Invalid);
+}
+
+TEST(ResultAccess, FallsBackOnAFailedUnwrapOr) {
+  Result<int, Error> bad = Err(Error::Empty);
+  Result<int, Error> good = Ok(1);
+
+  EXPECT_EQ(tare::move(bad).unwrap_or(99), 99);
+  EXPECT_EQ(tare::move(good).unwrap_or(99), 1);
+}
+
+TEST(ResultAccess, HandsTheErrorToUnwrapOrElse) {
+  Result<int, int> r = Err(3);
+
+  EXPECT_EQ(tare::move(r).unwrap_or_else([](int e) { return e * 10; }), 30);
+}
+
+TEST(ResultAccess, OnlyCallsUnwrapOrElseOnFailure) {
+  int calls = 0;
+  Result<int, int> r = Ok(1);
+
+  auto fallback = [&calls](int e) {
+    calls += 1;
+
+    return e;
+  };
+
+  EXPECT_EQ(tare::move(r).unwrap_or_else(fallback), 1);
+  EXPECT_EQ(calls, 0);
+}
+
+TEST(ResultAccess, ReachesMembersThroughTheArrow) {
+  auto r = Result<Duplicate, Error>::ok(11);
+
+  EXPECT_EQ(r->v, 11);
+}
+
+TEST(ResultAccess, HandsOutTheSuccessAsAnOptionalThroughOk) {
+  Result<int, Error> good = Ok(5);
+  Result<int, Error> bad = Err(Error::Empty);
+
+  Optional<int> a = tare::move(good).ok();
+  Optional<int> b = tare::move(bad).ok();
+
+  EXPECT_EQ(*a, 5);
+  EXPECT_FALSE(b.has_value());
+}
+
+TEST(ResultAccess, HandsOutTheFailureAsAnOptionalThroughErr) {
+  Result<int, Error> good = Ok(5);
+  Result<int, Error> bad = Err(Error::Invalid);
+
+  Optional<Error> a = tare::move(good).err();
+  Optional<Error> b = tare::move(bad).err();
+
+  EXPECT_FALSE(a.has_value());
+  EXPECT_EQ(*b, Error::Invalid);
+}
+
+TEST(ResultTransforms, TransformsTheSuccessThroughMap) {
+  Result<int, Error> r = Ok(4);
+  auto m = tare::move(r).map([](int x) { return x * 2; });
+
+  static_assert(SameAs<decltype(m), Result<int, Error>>);
+  EXPECT_EQ(*m, 8);
+}
+
+TEST(ResultTransforms, PassesAFailureThroughMapUntouched) {
+  int calls = 0;
+  Result<int, Error> r = Err(Error::Invalid);
+
+  auto m = tare::move(r).map([&calls](int x) {
+    calls += 1;
+
+    return x;
   });
+
+  EXPECT_TRUE(m.is_err());
+  EXPECT_EQ(m.error(), Error::Invalid);
+  EXPECT_EQ(calls, 0);
+}
+
+TEST(ResultTransforms, ChangesTheSuccessTypeThroughMap) {
+  Result<int, Error> r = Ok(3);
+  auto m = tare::move(r).map([](int x) { return static_cast<char>('a' + x); });
+
+  static_assert(SameAs<decltype(m), Result<char, Error>>);
+  EXPECT_EQ(*m, 'd');
+}
+
+TEST(ResultTransforms, TransformsTheFailureThroughMapErr) {
+  Result<int, int> r = Err(2);
+  auto m = tare::move(r).map_err([](int e) { return static_cast<char>('a' + e); });
+
+  static_assert(SameAs<decltype(m), Result<int, char>>);
+  EXPECT_EQ(m.error(), 'c');
+}
+
+TEST(ResultTransforms, PassesASuccessThroughMapErrUntouched) {
+  Result<int, int> r = Ok(7);
+  auto m = tare::move(r).map_err([](int e) { return e; });
+
+  EXPECT_EQ(*m, 7);
+}
+
+TEST(ResultTransforms, ChainsAFallibleStepThroughAndThen) {
+  Result<int, Error> r = Ok(4);
+
+  auto m = tare::move(r).and_then([](int x) -> Result<int, Error> {
+    return Ok(x * 10);
+  });
+
+  static_assert(SameAs<decltype(m), Result<int, Error>>);
+  EXPECT_EQ(*m, 40);
+}
+
+TEST(ResultTransforms, LetsAndThenTurnASuccessIntoAFailure) {
+  Result<int, Error> r = Ok(1);
+
+  auto m = tare::move(r).and_then([](int) -> Result<int, Error> {
+    return Err(Error::Invalid);
+  });
+
+  EXPECT_TRUE(m.is_err());
+  EXPECT_EQ(m.error(), Error::Invalid);
+}
+
+TEST(ResultTransforms, ShortCircuitsAndThenOnFailure) {
+  int calls = 0;
+  Result<int, Error> r = Err(Error::Empty);
+
+  auto m = tare::move(r).and_then([&calls](int x) -> Result<int, Error> {
+    calls += 1;
+
+    return Ok(x);
+  });
+
+  EXPECT_TRUE(m.is_err());
+  EXPECT_EQ(calls, 0);
+}
+
+TEST(ResultTransforms, RecoversFromAFailureThroughOrElse) {
+  Result<int, int> r = Err(1);
+
+  auto m = tare::move(r).or_else([](int e) -> Result<int, Error> {
+    return Ok(e * 100);
+  });
+
+  static_assert(SameAs<decltype(m), Result<int, Error>>);
+  EXPECT_EQ(*m, 100);
+}
+
+TEST(ResultTransforms, SkipsOrElseOnSuccess) {
+  int calls = 0;
+  Result<int, int> r = Ok(5);
+
+  auto m = tare::move(r).or_else([&calls](int e) -> Result<int, int> {
+    calls += 1;
+
+    return Ok(e);
+  });
+
+  EXPECT_EQ(*m, 5);
+  EXPECT_EQ(calls, 0);
+}
+
+TEST(ResultLifetime, DestroysASuccessAtScopeExit) {
+  int destroyed = 0;
+
+  {
+    auto r = Result<Tracked, int>::ok(&destroyed);
+  }
+
+  EXPECT_EQ(destroyed, 1);
+}
+
+TEST(ResultLifetime, DestroysAFailureAtScopeExit) {
+  int destroyed = 0;
+
+  {
+    auto r = Result<int, Tracked>::err(&destroyed);
+  }
+
+  EXPECT_EQ(destroyed, 1);
+}
+
+TEST(ResultLifetime, NeverDestroysTheSideItDoesNotHold) {
+  int destroyed = 0;
+
+  {
+    Result<Tracked, int> r = Err(5);
+  }
+
+  EXPECT_EQ(destroyed, 0);
+}
+
+TEST(ResultLifetime, MovesOwnershipWithoutDestroyingTwice) {
+  int destroyed = 0;
+
+  {
+    auto a = Result<Tracked, int>::ok(&destroyed);
+    Result<Tracked, int> b = tare::move(a);
+
+    EXPECT_EQ(destroyed, 0);
+  }
+
+  EXPECT_EQ(destroyed, 1);
+}
+
+TEST(ResultLifetime, DestroysOnceAfterUnwrapMovesTheValueOut) {
+  int destroyed = 0;
+
+  {
+    auto r = Result<Tracked, int>::ok(&destroyed);
+    Tracked t = tare::move(r).unwrap();
+
+    EXPECT_EQ(destroyed, 0);
+  }
+
+  EXPECT_EQ(destroyed, 1);
+}
+
+TEST(ResultLifetime, SwitchesSidesOnMoveAssignment) {
+  int destroyed = 0;
+
+  {
+    auto a = Result<Tracked, int>::ok(&destroyed);
+    Result<Tracked, int> b = Err(3);
+
+    a = tare::move(b);
+
+    EXPECT_EQ(destroyed, 1);
+    EXPECT_TRUE(a.is_err());
+    EXPECT_EQ(a.error(), 3);
+  }
+
+  EXPECT_EQ(destroyed, 1);
+}
+
+TEST(ResultComparison, ComparesSuccessesByValue) {
+  Result<int, int> a = Ok(1);
+  Result<int, int> b = Ok(1);
+  Result<int, int> c = Ok(2);
+
+  EXPECT_TRUE(a == b);
+  EXPECT_TRUE(a != c);
+}
+
+TEST(ResultComparison, ComparesFailuresByValue) {
+  Result<int, int> a = Err(1);
+  Result<int, int> b = Err(1);
+  Result<int, int> c = Err(2);
+
+  EXPECT_TRUE(a == b);
+  EXPECT_TRUE(a != c);
+}
+
+TEST(ResultComparison, NeverEquatesASuccessWithAFailure) {
+  Result<int, int> a = Ok(1);
+  Result<int, int> b = Err(1);
+
+  EXPECT_TRUE(a != b);
+}
+
+TEST(ResultLayout, NamesBothSides) {
+  static_assert(SameAs<Result<int, Error>::ValueType, int>);
+  static_assert(SameAs<Result<int, Error>::ErrorType, Error>);
+}
+
+TEST(ResultLayout, KeepsIntIntTriviallyCopyable) {
+  static_assert(TriviallyCopyable<Result<int, int>>);
+  static_assert(TriviallyMoveConstructible<Result<int, int>>);
+}
+
+TEST(ResultLayout, KeepsIntIntTriviallyDestructible) {
+  static_assert(TriviallyDestructible<Result<int, int>>);
+}
+
+TEST(ResultLayout, CostsOneWordBeyondTheLargerSide) {
+  static_assert(sizeof(Result<int, int>) == sizeof(int) * 2);
+  static_assert(sizeof(Result<int, char>) == sizeof(int) * 2);
+}
+
+TEST(ResultLayout, GoesNonTrivialWhenTheSuccessSideDoes) {
+  static_assert(!TriviallyDestructible<Result<Tracked, int>>);
+  static_assert(Movable<Result<Tracked, int>>);
+}
+
+TEST(ResultLayout, GoesNonTrivialWhenTheFailureSideDoes) {
+  static_assert(!TriviallyDestructible<Result<int, Tracked>>);
+  static_assert(Movable<Result<int, Tracked>>);
+}
+
+TEST(ResultLayout, RefusesToMoveOverAnImmovableType) {
+  static_assert(!Movable<Result<Immovable, int>>);
+  static_assert(!Movable<Result<int, Immovable>>);
+}
+
+TEST(ResultConstantEvaluation, RunsTheWholeApiAtCompileTime) {
+  static_assert(whole_api_in_constant_evaluation());
+  EXPECT_TRUE(whole_api_in_constant_evaluation());
 }
