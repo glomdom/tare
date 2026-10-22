@@ -1,3 +1,3 @@
 # tare
 
-A C++ library written with safety and performance as the goal.
+A C++ library written with safety in mind and performance as the goal.
