@@ -2,6 +2,8 @@
 
 #include <tare/memory/heap_allocator.hpp>
 
+#include <cstdlib>
+
 #include <tare/platform/memory.hpp>
 
 namespace tare::memory {
@@ -16,7 +18,7 @@ Span<u8> HeapAllocator::allocate(const Layout layout) {
     return Span<u8>::from_raw(static_cast<u8*>(mem), layout.size);
   }
 
-  void* mem = malloc(layout.size);
+  void* mem = std::malloc(layout.size);
   TARE_ASSERT(mem != nullptr);
 
   return Span<u8>::from_raw(static_cast<u8*>(mem), layout.size);
@@ -31,7 +33,7 @@ void HeapAllocator::deallocate(u8* ptr, const Layout layout) {
     return;
   }
 
-  free(ptr);
+  std::free(ptr);
 }
 
 [[nodiscard]] Allocator& default_allocator() {
